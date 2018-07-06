@@ -1,0 +1,68 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: C:\Kompose\kompose.exe convert -f .\docker-compose.yml
+    kompose.service.type: LoadBalancer
+    kompose.version: 1.13.0 (84fa826)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: jenkinshost
+  name: jenkinshost
+spec:
+  replicas: 1
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: jenkinshost
+    spec:
+      containers:
+      - image: jenkinsci/blueocean
+        name: jenkins-container
+        volumeMounts:
+        - mountPath: "/var/jenkins_home"
+          name: azure
+        ports:
+        - containerPort: 8080
+        resources: {}
+      volumes:
+      - name: azure
+        azureDisk:
+          kind: Managed
+          diskName: kubernetes-dynamic-pvc-2d4066e6-7f34-11e8-a8dc-0a58ac1f067c
+          diskURI: /subscriptions/0c696513-fea6-4bca-ad18-3119de65acef/resourceGroups/MC_rgaks_akscluster0_centralus/providers/Microsoft.Compute/disks/kubernetes-dynamic-pvc-2d4066e6-7f34-11e8-a8dc-0a58ac1f067c
+      restartPolicy: Always
+      initContainers:
+        - name: permissionsfix
+          image: alpine:latest
+          command: ["/bin/sh", "-c"]
+          args:
+            - chown 1000:1000 /var/jenkins_home;
+          volumeMounts:
+          - name: azure # Or you can replace with any name
+            mountPath: /var/jenkins_home # Must match the mount path in the args line
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    kompose.cmd: C:\Kompose\kompose.exe convert -f .\docker-compose.yml
+    kompose.service.type: LoadBalancer
+    kompose.version: 1.13.0 (84fa826)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: jenkinshost
+  name: jenkinshost
+spec:
+  type: LoadBalancer
+  ports:
+  - name: "jenkinsport"
+    port: 8080
+    targetPort: 8080
+  selector:
+    io.kompose.service: jenkinshost
+status:
+  loadBalancer: {}
