@@ -1,0 +1,80 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: C:\Kompose\kompose.exe convert -f .\docker-compose.yml
+    kompose.service.type: LoadBalancer
+    kompose.version: 1.13.0 (84fa826)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: jenkinsbox
+  name: jenkinsbox
+spec:
+  replicas: 1
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: jenkinsbox
+    spec:
+      containers:
+      - image: jenkinsci/blueocean
+        name: jenkins-container
+        volumeMounts:
+        - mountPath: "/var/jenkins_home"
+          name: volume
+        ports:
+        - containerPort: 8080
+        - containerPort: 50000
+        resources: {}
+      volumes:
+      - name: volume
+        persistentVolumeClaim:
+          claimName: azure-managed-disk
+      initContainers:
+      - name: permissionsfix
+        image: alpine:latest
+        command: ["/bin/sh", "-c"]
+        args:
+          - chown 1000:1000 /var/jenkins_home;
+        volumeMounts:
+        - name: volume # Or you can replace with any name
+          mountPath: /var/jenkins_home # Must match the mount path in the args line
+      restartPolicy: Always
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    kompose.cmd: C:\Kompose\kompose.exe convert -f .\docker-compose.yml
+    kompose.service.type: LoadBalancer
+    kompose.version: 1.13.0 (84fa826)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: jenkinsbox
+  name: jenkinsbox
+spec:
+  type: LoadBalancer
+  ports:
+  - name: "jenkinsport"
+    port: 8080
+    targetPort: 8080
+  selector:
+    io.kompose.service: jenkinsbox
+status:
+  loadBalancer: {}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: azure-managed-disk
+  annotations:
+    volume.beta.kubernetes.io/storage-class: managed-premium
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
